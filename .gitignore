@@ -1,0 +1,11 @@
+.env
+__pycache__/
+*.pyc
+*.pyo
+data/state.json
+data/claims/
+logs/
+*.log
+.venv/
+venv/
+.pytest_cache/
