@@ -80,8 +80,8 @@ def cmd_create(state: BotState) -> BotState:
         return state
 
 
-def cmd_accept(state: BotState) -> BotState:
-    """Execute acceptClaim for the decided winner."""
+def cmd_accept(state: BotState, auto_confirm: bool = False) -> BotState:
+    """Execute acceptClaim for the decided winner. Re-validates score at accept time."""
     if state.phase != Phase.DECIDED:
         print(f"Can only accept in DECIDED phase. Current: {state.phase}")
         return state
@@ -89,20 +89,35 @@ def cmd_accept(state: BotState) -> BotState:
         print("No winner recorded.")
         return state
 
+    # ── Re-verify score at accept time ──────────────────────────────────
+    winner_claim_id = state.winner_claim_id
+    evaluation = state.evaluations.get(winner_claim_id)
+    if evaluation is None:
+        print(f"ERROR: Claim #{winner_claim_id} has no evaluation record. Re-run evaluation first.")
+        return state
+    if evaluation.score < ScoringConfig().min_score:
+        print(
+            f"ERROR: Claim #{winner_claim_id} score {evaluation.score} is below "
+            f"minimum {ScoringConfig().min_score}. Will not accept."
+        )
+        return state
+
     print(f"\n{'='*60}")
     print("ACCEPTING WINNING CLAIM")
     print(f"{'='*60}")
     print(f"  Bounty ID   : {state.bounty_id}")
-    print(f"  Winner claim: {state.winner_claim_id}")
+    print(f"  Winner claim: {winner_claim_id}")
+    print(f"  Score       : {evaluation.score}/10")
     print()
 
-    confirm = input("  Send transaction? [y/N]: ").strip().lower()
-    if confirm != "y":
-        print("  Cancelled.")
-        return state
+    if not auto_confirm:
+        confirm = input("  Send transaction? [y/N]: ").strip().lower()
+        if confirm != "y":
+            print("  Cancelled.")
+            return state
 
     try:
-        tx_hash = accept_claim(state.bounty_id, state.winner_claim_id)
+        tx_hash = accept_claim(state.bounty_id, winner_claim_id)
         print(f"\n  ✅ Claim accepted!")
         print(f"  Tx hash    : {tx_hash}")
         print(f"  Explorer   : {EXPLORER}/tx/{tx_hash}")
@@ -164,20 +179,26 @@ def main() -> None:
     parser.add_argument("--status", action="store_true", help="Show bot status and exit")
     parser.add_argument("--reset", action="store_true", help="Reset state to IDLE (DANGER: clears bounty state)")
     parser.add_argument("--run", action="store_true", help="Run the polling loop")
+    parser.add_argument("--yes", action="store_true", help="Skip interactive confirmation prompts (for unattended runs)")
     args = parser.parse_args()
 
     state = BotState.load()
 
     # --reset
     if args.reset:
-        confirm = input("Reset bot state to IDLE? This clears bounty/claim state. [y/N]: ").strip().lower()
-        if confirm == "y":
-            from config import STATE_FILE
+        if args.yes:
             state = BotState()
             state.save()
             print("State reset to IDLE.")
         else:
-            print("Aborted.")
+            confirm = input("Reset bot state to IDLE? This clears bounty/claim state. [y/N]: ").strip().lower()
+            if confirm == "y":
+                from config import STATE_FILE
+                state = BotState()
+                state.save()
+                print("State reset to IDLE.")
+            else:
+                print("Aborted.")
         return
 
     # --status
@@ -192,7 +213,7 @@ def main() -> None:
 
     # --accept
     if args.accept:
-        state = cmd_accept(state)
+        state = cmd_accept(state, auto_confirm=args.yes)
         return
 
     # --run (default: run the scheduler)

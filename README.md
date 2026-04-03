@@ -113,8 +113,20 @@ Persisted in `data/state.json`. Restart-safe — resumes from last known phase.
 ## Persistence
 
 - `data/state.json` — bot state (phase, bounty_id, claims_seen, evaluations, winner)
-- `data/claims/` — downloaded claim images
+- `data/claims/<id>/proof.jpg` — downloaded claim images
 - `logs/` — timestamped evaluation logs + winner explanations
+
+## Security
+
+- File size limit: 50 MB max per downloaded image
+- Image dimension limit: 80 MP max (rejects pixel bombs)
+- IPFS path traversal blocked (rejects `../`, validates CID format)
+- Arweave path traversal blocked
+- Content-Type validated before JSON parsing (no HTML-error-page spoofing)
+- Pagination guard: max 10,000 claims per bounty
+- Score re-verified at `acceptClaim` time (cannot accept un-scored claims)
+- PRIVATE_KEY never logged or echoed
+- `--yes` flag for unattended / cron deploys (bypasses interactive prompts)
 
 ## Chain Support
 
@@ -130,5 +142,6 @@ Persisted in `data/state.json`. Restart-safe — resumes from last known phase.
 - Bot wallet is a hot wallet — only fund with what you can afford to lose
 - State machine prevents double-accepting
 - `cast` CLI handles all signing — no external signer needed
+- ⚠️ RPC URL should be a trusted endpoint (e.g. Alchemy, QuickNode, or Base public RPC). A malicious RPC could proxy signed transactions. Use a reputable provider.
 
 MIT

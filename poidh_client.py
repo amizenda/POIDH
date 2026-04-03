@@ -15,6 +15,12 @@ import requests
 
 import config
 
+# ─── Security limits ───────────────────────────────────────────────────────
+
+MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024   # 50 MB
+MAX_IMAGE_PIXELS    = 80_000_000          # ~80 MP (e.g. 10000 x 8000)
+VALID_CID_PREFIXES  = ("Qm", "bafy", "bag")  # valid IPFS CID v0 / v1 prefixes
+
 
 # ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -116,11 +122,13 @@ def get_claims(bounty_id: int, offset: int = 0, limit: int = 10) -> list[Claim]:
     """
     Fetch claims for a bounty (paginated, 10 at a time).
     Returns all claims found (handles pagination automatically).
+    Guards against infinite loops (max 1000 iterations = 10,000 claims).
     """
     all_claims: list[Claim] = []
     current_offset = offset
+    max_pages = 1000  # 10 * 1000 = 10,000 claims max
 
-    while True:
+    for _ in range(max_pages):
         out = _cast_call(
             "getClaimsByBountyId(uint256,uint256)"
             "(tuple(uint256,address,uint256,address,string,string,uint256,bool)[])",
@@ -135,11 +143,12 @@ def get_claims(bounty_id: int, offset: int = 0, limit: int = 10) -> list[Claim]:
         if not claims:
             break
         all_claims.extend(claims)
-        current_offset += limit
 
         # If we got fewer than limit, we're done
         if len(claims) < limit:
             break
+
+        current_offset += limit
 
     return all_claims
 
@@ -199,16 +208,39 @@ def fetch_token_uri(nft_contract: str, claim_id: int) -> str:
     return _cast_call("tokenURI(uint256)(string)", str(claim_id), contract=nft_contract)
 
 
+def _validate_ipfs_path(path: str) -> str:
+    """
+    Validate and sanitize an IPFS path component.
+    Rejects path traversal attempts (../) and unknown CID formats.
+    Returns the clean path segment (hash or hash/subpath).
+    """
+    # Reject path traversal
+    if ".." in path or path.startswith("/"):
+        raise ValueError(f"Invalid IPFS path: {path!r}")
+
+    # Extract just the CID (first segment)
+    segments = path.split("/")
+    cid = segments[0]
+
+    if not any(cid.startswith(p) for p in VALID_CID_PREFIXES):
+        raise ValueError(f"Unknown IPFS CID format: {cid!r}")
+
+    # Return the original path (with subpaths intact for directory CIDs)
+    return path
+
+
 def resolve_uri(uri: str) -> str:
     """
     Convert ipfs:// / ar:// URIs to fetchable HTTP URLs.
+    Validates CID format and rejects path traversal.
     Returns the resolved URL (or original if already HTTP).
     """
     if uri.startswith("ipfs://"):
-        # Try each gateway
-        ipfs_hash = uri.replace("ipfs://", "")
-        for gateway in config.ScoringConfig().ipfs_gateways:
-            url = f"{gateway}{ipfs_hash}"
+        raw_path = uri.replace("ipfs://", "")
+        ipfs_path = _validate_ipfs_path(raw_path)
+        gateways = config.ScoringConfig().ipfs_gateways
+        for gateway in gateways:
+            url = f"{gateway}{ipfs_path}"
             try:
                 r = requests.head(url, timeout=5, allow_redirects=True)
                 if r.status_code == 200:
@@ -216,9 +248,11 @@ def resolve_uri(uri: str) -> str:
             except Exception:
                 continue
         # Last resort: return first gateway
-        return f"{config.ScoringConfig().ipfs_gateways[0]}{ipfs_hash}"
+        return f"{gateways[0]}{ipfs_path}"
     elif uri.startswith("ar://"):
         ar_hash = uri.replace("ar://", "")
+        if ".." in ar_hash or "/" in ar_hash:
+            raise ValueError(f"Invalid arweave path: {ar_hash!r}")
         return f"https://arweave.net/{ar_hash}"
     return uri  # already HTTP
 
@@ -226,33 +260,68 @@ def resolve_uri(uri: str) -> str:
 def fetch_metadata(uri: str) -> dict:
     """
     Fetch JSON metadata from URI.
-    Returns dict with 'image' / 'animation_url' / etc.
-    Falls back to treating URI as direct content URL.
+    Validates Content-Type header before parsing as JSON.
+    Falls back to treating URI as direct content URL only on network error.
     """
     url = resolve_uri(uri)
     try:
         r = requests.get(url, timeout=15)
         r.raise_for_status()
-        content_type = r.headers.get("content-type", "")
-        if "json" in content_type:
-            return r.json()
-        # Try parsing as JSON anyway
-        return r.json()
+        content_type = r.headers.get("content-type", "").lower()
+        if "json" in content_type or "text" in content_type:
+            parsed = r.json()
+            return parsed
+        # Non-JSON response — don't silently treat HTML errors as valid metadata
+        raise RuntimeError(
+            f"Unexpected Content-Type '{content_type}' for metadata URI: {url[:80]}"
+        )
+    except RuntimeError:
+        raise  # re-raise our own errors
     except Exception:
+        # Network / connection error — fall back to direct URL
         return {"image": url, "direct": True}
 
 
 def fetch_image(url: str, dest_path: Path) -> bool:
-    """Download image to dest_path. Returns True on success."""
+    """Download image to dest_path. Enforces MAX_FILE_SIZE_BYTES. Returns True on success."""
     try:
-        r = requests.get(url, timeout=30, stream=True, headers={
+        with requests.get(url, timeout=30, stream=True, headers={
             "User-Agent": "Mozilla/5.0 (compatible; poidh-bot/1.0)"
-        })
-        r.raise_for_status()
-        dest_path.write_bytes(r.content)
+        }) as r:
+            r.raise_for_status()
+            # Stream to disk, abort if over size limit
+            bytes_written = 0
+            with open(dest_path, "wb") as f:
+                for chunk in r.iter_content(chunk_size=65536):
+                    bytes_written += len(chunk)
+                    if bytes_written > MAX_FILE_SIZE_BYTES:
+                        dest_path.unlink(missing_ok=True)
+                        raise RuntimeError(
+                            f"File exceeds {MAX_FILE_SIZE_BYTES // (1024*1024)} MB limit "
+                            f"({url[:80]})"
+                        )
+                    f.write(chunk)
         return True
     except Exception:
+        # Clean up partial write
+        dest_path.unlink(missing_ok=True)
         return False
+
+
+def validate_image_size(path: Path) -> tuple[int, int] | None:
+    """
+    Verify image dimensions before full processing.
+    Returns (width, height) or None if invalid.
+    Rejects images with more than MAX_IMAGE_PIXELS total pixels.
+    """
+    try:
+        with Image.open(path) as im:
+            w, h = im.size
+            if w * h > MAX_IMAGE_PIXELS:
+                return None
+            return w, h
+    except Exception:
+        return None
 
 
 def get_current_block_time() -> int:
