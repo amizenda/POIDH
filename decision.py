@@ -31,18 +31,23 @@ def select_winner(state: BotState) -> int | None:
         print("  No claims reached minimum score.")
         return None
 
-    # Sort by: score desc, text_match desc, scene desc, created_at asc
+    # Sort by: score desc, text_match desc, scene desc, created_at ASC (earlier = better)
+    # Tie-break rules (exact match to bounty spec):
+    #   1. higher total score
+    #   2. higher text_match
+    #   3. higher physical_scene
+    #   4. earlier on-chain submission time (created_at)
     valid.sort(
         key=lambda x: (
             -x[1].score,
             -x[1].breakdown["text_match"],
             -x[1].breakdown["physical_scene"],
-            x[1].timestamp,         # earlier = better (lower timestamp)
+            x[1].created_at,     # earlier = smaller unix timestamp = wins
         )
     )
 
     winner_id, winner_ev = valid[0]
-    print(f"  Winner: claim #{winner_id} | score={winner_ev.score} | text={winner_ev.breakdown['text_match']}/5 | scene={winner_ev.breakdown['physical_scene']}/3")
+    print(f"  Winner: claim #{winner_id} | score={winner_ev.score} | text={winner_ev.breakdown['text_match']}/5 | scene={winner_ev.breakdown['physical_scene']}/3 | created_at={winner_ev.created_at}")
     return winner_id
 
 
@@ -66,6 +71,7 @@ def generate_explanation(
                     "score": ev.score,
                     "breakdown": ev.breakdown,
                     "ocr_text": ev.ocr_text,
+                    "created_at": ev.created_at,
                     "timestamp": datetime.fromtimestamp(ev.timestamp).isoformat(),
                 }
                 for cid, ev in state.evaluations.items()
@@ -95,6 +101,7 @@ def generate_explanation(
                     "score": ev.score,
                     "breakdown": ev.breakdown,
                     "ocr_text": ev.ocr_text,
+                    "created_at": ev.created_at,
                     "timestamp": datetime.fromtimestamp(ev.timestamp).isoformat(),
                 }
                 for cid, ev in state.evaluations.items()

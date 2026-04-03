@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import requests
+from PIL import Image
 
 import config
 

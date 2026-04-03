@@ -9,6 +9,7 @@ import sys
 import time
 from datetime import datetime
 
+import config  # full module import needed for config.LOG_DIR in social calls
 from config import (
     BountyConfig,
     ScoringConfig,
@@ -18,11 +19,13 @@ from config import (
     V2_OFFSET,
     PRIVATE_KEY,
     RPC_URL,
+    LOG_DIR,
 )
 from state import BotState, Phase
 from poidh_client import create_solo_bounty, accept_claim, get_current_block_time
 import scheduler
 import social
+from decision import generate_explanation
 
 
 # ─── Commands ────────────────────────────────────────────────────────────────
@@ -126,7 +129,6 @@ def cmd_accept(state: BotState, auto_confirm: bool = False) -> BotState:
         state.set_phase(Phase.ACCEPTED)
 
         # Post social
-        from decision import generate_explanation
         exp_path = generate_explanation(state, state.winner_claim_id, config.LOG_DIR)
         social.post_winner(state, state.winner_claim_id, exp_path, tx_hash)
 
@@ -216,13 +218,13 @@ def main() -> None:
         state = cmd_accept(state, auto_confirm=args.yes)
         return
 
-    # --run (default: run the scheduler)
-    if args.run or (not any([args.create, args.accept, args.status])):
-        # Check prerequisites
-        if state.phase == Phase.IDLE and state.bounty_id is None:
-            print("No active bounty. Run: python main.py --create")
-            return
+    # --run (default: auto-run the scheduler)
+    if args.run or args.create or args.accept:
         scheduler.run(state)
+        return
+
+    # Default: auto-run (no args given)
+    scheduler.run(state)
 
 
 if __name__ == "__main__":

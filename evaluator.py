@@ -10,6 +10,7 @@ from pathlib import Path
 from PIL import Image
 
 import config
+import poidh_client
 from state import Evaluation
 from poidh_client import resolve_nft_contract, fetch_token_uri, resolve_uri, fetch_metadata, fetch_image
 import scorer
@@ -93,6 +94,7 @@ def evaluate_claim(
                 },
                 ocr_text="[IMAGE_FETCH_FAILED]",
                 image_path=None,
+                created_at=created_at,
                 timestamp=time.time(),
             )
 
@@ -122,6 +124,7 @@ def evaluate_claim(
                        "image_quality": 0.0, "anti_screen": 0.0},
             ocr_text=f"[INVALID_IMAGE] {e}",
             image_path=None,
+            created_at=created_at,
             timestamp=time.time(),
         )
 
@@ -157,5 +160,6 @@ def evaluate_claim(
         breakdown=breakdown,
         ocr_text=ocr_text[:500],  # truncate long OCR output
         image_path=str(image_path),
+        created_at=created_at,
         timestamp=time.time(),
     )

@@ -31,6 +31,7 @@ class Evaluation:
     breakdown: dict[str, float]
     ocr_text: str
     image_path: str | None
+    created_at: int = 0        # on-chain claim submission timestamp (for tie-break)
     timestamp: float = field(default_factory=time.time)
 
     def to_dict(self) -> dict:
@@ -54,7 +55,9 @@ class BotState:
     # ── Serialisation helpers ────────────────────────────────────────────────
 
     def _eval_to_dict(self, ev: Evaluation) -> dict:
-        return ev.to_dict()
+        d = ev.to_dict()
+        d["created_at"] = ev.created_at
+        return d
 
     def to_dict(self) -> dict:
         return {
@@ -82,6 +85,7 @@ class BotState:
                 breakdown=v["breakdown"],
                 ocr_text=v["ocr_text"],
                 image_path=v.get("image_path"),
+                created_at=v.get("created_at", 0),
                 timestamp=v.get("timestamp", time.time()),
             )
         return cls(
