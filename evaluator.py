@@ -98,15 +98,23 @@ def evaluate_claim(
 
     print(f"    Image saved: {image_path}")
 
-    # ── Step 4: Verify it's actually an image ───────────────────────────
+    # ── Step 4: Verify it's actually an image + check dimensions ────────
     try:
         with Image.open(image_path) as im:
             im.verify()
+        dims = poidh_client.validate_image_size(image_path)
+        if dims is None:
+            raise RuntimeError(
+                f"Image dimensions exceed limit "
+                f"(>{poidh_client.MAX_IMAGE_PIXELS // 1_000_000} MP)"
+            )
         with Image.open(image_path) as im:
             w, h = im.size
             print(f"    Image: {w}x{h} {im.format}")
     except Exception as e:
         print(f"    [WARN] Not a valid image: {e}")
+        # Clean up bad file
+        image_path.unlink(missing_ok=True)
         return Evaluation(
             claim_id=claim_id,
             score=0.0,
