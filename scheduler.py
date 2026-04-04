@@ -179,11 +179,22 @@ def _accept(state: BotState) -> BotState:
 
         # Generate explanation and post publicly
         exp_path = generate_explanation(state, winner_id, LOG_DIR)
-        post_result = social.post_winner(state, winner_id, tx_hash)
-
-        # Save public URL to state if available
-        if post_result.public_url:
-            print(f"  🌐 Public post: {post_result.public_url}")
+        try:
+            post_result = social.post_winner(state, winner_id, tx_hash)
+            state.set_post_url(post_result.public_url)
+            if post_result.public_url:
+                print(f"  🌐 Public post: {post_result.public_url}")
+        except RuntimeError as e:
+            # Production mode: social posting failure is fatal
+            err_msg = str(e)
+            print(f"  ❌ Social posting failed (production mode): {err_msg}")
+            state.set_error(f"social: {err_msg}")
+            # Stay in ACCEPTED but log — the on-chain tx succeeded, social is a best-effort public record
+            # Don't revert phase — the bounty is paid. Log and continue.
+            state.phase = Phase.ACCEPTED
+            state.save()
+            print("\n  🎉 Bounty paid on-chain. Bot shutdown.")
+            return state
 
         print("\n  🎉 Bounty fully resolved. Bot shutdown.")
         return state

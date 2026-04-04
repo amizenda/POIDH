@@ -15,8 +15,8 @@ Autonomous Python bot that creates a SOLO bounty on Base, polls for photo claims
 [8] Fetch and evaluate all claims
 [9] Select winner (deterministic tie-break)
 [10] Auto-call acceptClaim on-chain
-[11] Generate + publish public explanation
-[12] Persist final state — restart-safe
+[11] Generate + publish public explanation (Farcaster/X in production)
+[12] Persist final state — restart-safe, including decision_post_url
 ```
 
 ## Prerequisites
@@ -74,11 +74,53 @@ TARGET_PHRASE=POIDH BOT 31
 LOG_DIR=./logs
 DATA_DIR=./data
 
-# SOCIAL POSTING (optional — bot runs with mock fallback if not set)
-SOCIAL_PLATFORM=mock          # "mock" (default) or "farcaster"
-NEYNAR_API_KEY=              # required for real Faracster posting
-FARCASTER_SIGNER_UUID=       # required for real Faracster posting
+# ── Social Posting ──────────────────────────────────────────────────────────
+
+# PRODUCTION (required for bounty submission):
+# When true: real platform is mandatory, missing credentials → bot STOPS
+# When false: mock fallback allowed (dev mode only)
+REQUIRE_PUBLIC_POST=true
+
+# Platform: "mock" (local file only), "farcaster" (Neynar), "x" (Twitter v2)
+# When REQUIRE_PUBLIC_POST=true, must be "farcaster" or "x" — NOT "mock"
+SOCIAL_PLATFORM=farcaster
+
+# Faracster (Neynar v2) — required when SOCIAL_PLATFORM=farcaster
+NEYNAR_API_KEY=your_neynar_api_key
+FARCASTER_SIGNER_UUID=your_signer_uuid
+
+# Twitter/X — required when SOCIAL_PLATFORM=x
+# Requires Twitter Developer Elevated access (free sandbox cannot post)
+X_BEARER_TOKEN=
+X_API_KEY=
+X_API_SECRET=
+X_ACCESS_TOKEN=
+X_ACCESS_TOKEN_SECRET=
 ```
+
+## Production Mode
+
+Set `REQUIRE_PUBLIC_POST=true` before running. This enforces real public posting and **stops the bot** if credentials are missing or posting fails.
+
+```env
+REQUIRE_PUBLIC_POST=true
+SOCIAL_PLATFORM=farcaster
+NEYNAR_API_KEY=your_neynar_api_key
+FARCASTER_SIGNER_UUID=your_signer_uuid
+```
+
+**Farcaster setup:**
+1. Get a Neynar API key at [neynar.com](https://neynar.com)
+2. Create a signer UUID via the Neynar developer dashboard
+3. Authorize the signer with your farcaster account
+
+**What happens if credentials are missing in production mode:**
+```
+RuntimeError: REQUIRE_PUBLIC_POST=true but SOCIAL_PLATFORM=mock
+```
+Bot stops immediately — no on-chain action is taken until credentials are configured.
+
+**Dev mode (`REQUIRE_PUBLIC_POST=false`):** mock fallback is allowed, bot continues on failure.
 
 ## Autonomy & Recovery
 
@@ -139,10 +181,66 @@ POIDH/
 
 | File | Purpose |
 |---|---|
-| `data/state.json` | Bot phase, bounty ID, seen claims, evaluations, winner |
+| `data/state.json` | Bot phase, bounty ID, tx hashes, evaluations, **decision_post_url** |
 | `data/claims/<id>/proof.jpg` | Downloaded claim images |
 | `logs/explanation_*.json` | Full evaluation logs |
 | `logs/social_post_*.txt` | Social announcements |
+
+## Example End-to-End Run
+
+When the bot completes, the following artifacts are produced autonomously:
+
+### Bounty Creation
+```
+Bounty created! Tx: 0x...
+View: https://poidh.xyz/base/bounty/1234
+Explorer: https://basescan.org/tx/0x...
+```
+
+### Accept Claim
+```
+Auto-accepting claim #1...
+Claim accepted! Tx: 0x...
+Explorer: https://basescan.org/tx/0x...
+```
+
+### Public Explanation Post
+```
+Public post: https://warpcast.com/a/0x123abc...def456
+```
+
+### Final `data/state.json`
+```json
+{
+  "phase": "ACCEPTED",
+  "bounty_id": 1234,
+  "bounty_tx_hash": "0x...",
+  "deadline": 1712345678,
+  "claims_seen": [1, 2, 3],
+  "evaluations": {
+    "1": {
+      "claim_id": 1,
+      "score": 8.5,
+      "breakdown": {
+        "text_match": 5.0,
+        "physical_scene": 2.0,
+        "image_quality": 1.0,
+        "anti_screen": 0.5
+      },
+      "ocr_text": "POIDH BOT 31",
+      "created_at": 1712340000,
+      "timestamp": 1712349000.123
+    }
+  },
+  "winner_claim_id": 1,
+  "accept_tx_hash": "0x...",
+  "decision_post_url": "https://warpcast.com/a/0x123abc...def456",
+  "error": null,
+  "updated_at": 1712349500.567
+}
+```
+
+See `examples/` directory for full example artifacts.
 
 ## Chain Support
 

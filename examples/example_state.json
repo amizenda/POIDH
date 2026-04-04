@@ -1,0 +1,56 @@
+{
+  "phase": "ACCEPTED",
+  "bounty_id": 1234,
+  "bounty_tx_hash": "0xabc123def456...",
+  "deadline": 1712345678,
+  "claims_seen": [1, 2, 3],
+  "evaluations": {
+    "1": {
+      "claim_id": 1,
+      "score": 8.5,
+      "breakdown": {
+        "text_match": 5.0,
+        "physical_scene": 2.0,
+        "image_quality": 1.0,
+        "anti_screen": 0.5
+      },
+      "ocr_text": "POIDH BOT 31",
+      "image_path": "data/claims/1/proof.jpg",
+      "created_at": 1712340000,
+      "timestamp": 1712349000.123
+    },
+    "2": {
+      "claim_id": 2,
+      "score": 7.2,
+      "breakdown": {
+        "text_match": 4.0,
+        "physical_scene": 1.5,
+        "image_quality": 1.0,
+        "anti_screen": 0.7
+      },
+      "ocr_text": "POIDH BOT 31",
+      "image_path": "data/claims/2/proof.jpg",
+      "created_at": 1712340500,
+      "timestamp": 1712349100.234
+    },
+    "3": {
+      "claim_id": 3,
+      "score": 5.8,
+      "breakdown": {
+        "text_match": 3.0,
+        "physical_scene": 1.0,
+        "image_quality": 1.0,
+        "anti_screen": 0.8
+      },
+      "ocr_text": "POIDH 80T 31",
+      "image_path": "data/claims/3/proof.jpg",
+      "created_at": 1712341000,
+      "timestamp": 1712349200.345
+    }
+  },
+  "winner_claim_id": 1,
+  "accept_tx_hash": "0xdef789abc012...",
+  "decision_post_url": "https://warpcast.com/a/0x123abc...def456",
+  "error": null,
+  "updated_at": 1712349500.567
+}

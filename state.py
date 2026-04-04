@@ -46,9 +46,9 @@ class BotState:
     deadline: int | None = None          # Unix timestamp
     claims_seen: list[int] = field(default_factory=list)
     evaluations: dict[str, Evaluation] = field(default_factory=dict)
-    # claim_id (str) -> Evaluation dict
     winner_claim_id: int | None = None
     accept_tx_hash: str | None = None
+    decision_post_url: str | None = None   # public social post URL (Farcaster/X)
     error: str | None = None
     updated_at: float = field(default_factory=time.time)
 
@@ -71,6 +71,7 @@ class BotState:
             },
             "winner_claim_id": self.winner_claim_id,
             "accept_tx_hash": self.accept_tx_hash,
+            "decision_post_url": self.decision_post_url,
             "error": self.error,
             "updated_at": time.time(),
         }
@@ -97,6 +98,7 @@ class BotState:
             evaluations=evals,
             winner_claim_id=d.get("winner_claim_id"),
             accept_tx_hash=d.get("accept_tx_hash"),
+            decision_post_url=d.get("decision_post_url"),
             error=d.get("error"),
             updated_at=d.get("updated_at", time.time()),
         )
@@ -142,6 +144,10 @@ class BotState:
 
     def clear_error(self) -> None:
         self.error = None
+        self.save()
+
+    def set_post_url(self, url: str | None) -> None:
+        self.decision_post_url = url
         self.save()
 
     def is_terminal(self) -> bool:

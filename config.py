@@ -97,6 +97,27 @@ class ScoringConfig:
 POLL_INTERVAL = int(os.getenv("POLL_INTERVAL_SECONDS", "300"))
 
 
+# ─── Social / Public Posting ───────────────────────────────────────────────
+
+# When True: real platform is mandatory, missing credentials → bot stops (production)
+# When False: mock fallback allowed if credentials missing (dev mode)
+REQUIRE_PUBLIC_POST: bool = os.getenv("REQUIRE_PUBLIC_POST", "false").lower().strip() == "true"
+
+# Platform: "mock" (local file), "farcaster" (Neynar), "x" (Twitter v2)
+SOCIAL_PLATFORM: str = os.getenv("SOCIAL_PLATFORM", "mock").lower().strip()
+
+# Required when SOCIAL_PLATFORM=farcaster:
+NEYNAR_API_KEY: str | None = os.getenv("NEYNAR_API_KEY")
+FARCASTER_SIGNER_UUID: str | None = os.getenv("FARCASTER_SIGNER_UUID")
+
+# Required when SOCIAL_PLATFORM=x:
+X_BEARER_TOKEN: str | None = os.getenv("X_BEARER_TOKEN")
+X_API_KEY: str | None = os.getenv("X_API_KEY")
+X_API_SECRET: str | None = os.getenv("X_API_SECRET")
+X_ACCESS_TOKEN: str | None = os.getenv("X_ACCESS_TOKEN")
+X_ACCESS_TOKEN_SECRET: str | None = os.getenv("X_ACCESS_TOKEN_SECRET")
+
+
 # ─── Paths ──────────────────────────────────────────────────────────────────
 
 DATA_DIR = Path(os.getenv("DATA_DIR", "./data"))

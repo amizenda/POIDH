@@ -1,0 +1,63 @@
+{
+  "result": "WINNER_SELECTED",
+  "winner_claim_id": 1,
+  "winner_score": 8.5,
+  "winner_breakdown": {
+    "text_match": 5.0,
+    "physical_scene": 2.0,
+    "image_quality": 1.0,
+    "anti_screen": 0.5
+  },
+  "winner_ocr_text": "POIDH BOT 31",
+  "runner_ups": {
+    "2": {
+      "score": 7.2,
+      "breakdown": {
+        "text_match": 4.0,
+        "physical_scene": 1.5,
+        "image_quality": 1.0,
+        "anti_screen": 0.7
+      }
+    }
+  },
+  "all_evaluations": {
+    "1": {
+      "score": 8.5,
+      "breakdown": {
+        "text_match": 5.0,
+        "physical_scene": 2.0,
+        "image_quality": 1.0,
+        "anti_screen": 0.5
+      },
+      "ocr_text": "POIDH BOT 31",
+      "created_at": 1712340000,
+      "timestamp": "2026-04-06T12:30:00.123Z"
+    },
+    "2": {
+      "score": 7.2,
+      "breakdown": {
+        "text_match": 4.0,
+        "physical_scene": 1.5,
+        "image_quality": 1.0,
+        "anti_screen": 0.7
+      },
+      "ocr_text": "POIDH BOT 31",
+      "created_at": 1712340500,
+      "timestamp": "2026-04-06T12:31:40.234Z"
+    },
+    "3": {
+      "score": 5.8,
+      "breakdown": {
+        "text_match": 3.0,
+        "physical_scene": 1.0,
+        "image_quality": 1.0,
+        "anti_screen": 0.8
+      },
+      "ocr_text": "POIDH 80T 31",
+      "created_at": 1712341000,
+      "timestamp": "2026-04-06T12:33:20.345Z"
+    }
+  },
+  "bounty_id": 1234,
+  "generated_at": "2026-04-06T12:35:00.567Z"
+}
